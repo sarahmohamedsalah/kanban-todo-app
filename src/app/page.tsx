@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Box, Typography, TextField } from "@mui/material";
 import TaskColumn from "../../components/TaskColumn";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getTasks, updateTask } from "../../services/api";
+import { getTasks, updateTask, deleteTask } from "../../services/api";
 
 import { DragDropContext, DropResult } from "@hello-pangea/dnd";
 import { Task } from "../app/types";
@@ -44,6 +44,17 @@ export default function HomePage() {
     mutationFn: (task) => updateTask(task.id, task),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+  /**
+   * Mutation hook to delete a task on the backend.
+   * On success, it invalidates the tasks query to refetch updated data and closes any open edit modal.
+   */
+  const deleteTaskMutation = useMutation<void, Error, number>({
+    mutationFn: deleteTask,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      setEditingTask(null); // Close modal if open
     },
   });
 
@@ -108,6 +119,18 @@ export default function HomePage() {
   const handleEditTask = (task: Task) => {
     setEditingTask(task);
   };
+  /**
+   * Handler to delete a task by ID.
+   * Prompts the user for confirmation before performing deletion.
+   * Calls the delete mutation to remove the task from the backend.
+   *
+   * @param {number} taskId - The ID of the task to delete.
+   */
+  const handleDeleteTask = (taskId: number) => {
+    if (confirm("Are you sure you want to delete this task?")) {
+      deleteTaskMutation.mutate(taskId);
+    }
+  };
 
   return (
     <>
@@ -135,6 +158,7 @@ export default function HomePage() {
               title={col.replace("_", " ").toUpperCase()}
               tasks={getTasksByColumn(col)}
               onEditTask={handleEditTask} // pass correctly typed callback
+              onDeleteTask={handleDeleteTask}
             />
           ))}
         </Box>

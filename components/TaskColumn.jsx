@@ -8,7 +8,13 @@ import TaskFormModal from "./TaskFormModal";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createTask } from "../services/api";
 
-export default function TaskColumn({ columnKey, title, tasks, onEditTask }) {
+export default function TaskColumn({
+  columnKey,
+  title,
+  tasks,
+  onEditTask,
+  onDeleteTask,
+}) {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -44,6 +50,7 @@ export default function TaskColumn({ columnKey, title, tasks, onEditTask }) {
                 task={task}
                 index={index}
                 onEditTask={onEditTask}
+                onDelete={() => onDeleteTask(task.id)}
               />
             ))}
             {provided.placeholder}

@@ -29,12 +29,6 @@
       "column": "in_progress",
       "title": "hello world",
       "description": "hey"
-    },
-    {
-      "id": "b20d",
-      "column": "review",
-      "title": "hey",
-      "description": "hey"
     }
   ]
 }
