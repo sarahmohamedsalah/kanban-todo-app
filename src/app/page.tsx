@@ -1,103 +1,163 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState } from "react";
+import { Box, Typography, TextField } from "@mui/material";
+import TaskColumn from "../../components/TaskColumn";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getTasks, updateTask } from "../../services/api";
+
+import { DragDropContext, DropResult } from "@hello-pangea/dnd";
+import { Task } from "../app/types";
+import TaskFormModal from "../../components/TaskFormModal"; // import modal
+
+/**
+ * HomePage component renders the Kanban board with tasks
+ * organized by columns, supports search, drag-and-drop, and task updates.
+ */
+export default function HomePage() {
+  // State to track current search query for filtering tasks
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // State to track the task currently being edited; null means no modal open
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  /**
+   * Fetch tasks using React Query with search filtering.
+   * The query is re-fetched automatically when `searchQuery` changes.
+   */
+  const { data: tasks = [] } = useQuery<Task[]>({
+    queryKey: ["tasks", searchQuery],
+    queryFn: ({ queryKey, signal }) => {
+      // Destructure to get search string (ignore first key)
+      const [, search] = queryKey as [string, string];
+      return getTasks({ search, signal });
+    },
+  });
+
+  const queryClient = useQueryClient();
+
+  /**
+   * Mutation hook to update a task on the backend.
+   * On success, it invalidates the tasks query to refetch updated data.
+   */
+  const moveTask = useMutation<Task, Error, Task>({
+    mutationFn: (task) => updateTask(task.id, task),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    },
+  });
+
+  /**
+   * Mutation hook specifically for editing/updating tasks via modal.
+   * On success, refetch tasks and close modal.
+   */
+  const updateTaskMutation = useMutation<Task, Error, Task>({
+    mutationFn: (task) => updateTask(task.id, task),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      setEditingTask(null);
+    },
+  });
+
+  /**
+   * Handler for drag end event triggered by @hello-pangea/dnd.
+   * Updates the task's column locally (optimistic update)
+   * and triggers backend update mutation.
+   */
+  const handleDragEnd = (result: DropResult) => {
+    // If dropped outside any droppable area, do nothing
+    if (!result.destination) return;
+
+    const taskId = Number(result.draggableId); // ID of the dragged task
+    const newColumn = result.destination.droppableId; // ID of the destination column
+
+    // Find the dragged task from current tasks
+    const task = tasks.find((t) => t.id === taskId);
+
+    // If the task exists and column changed, update it
+    if (task && task.column !== newColumn) {
+      // Optimistically update the local cache for instant UI feedback
+      queryClient.setQueryData<Task[]>(["tasks", searchQuery], (old = []) =>
+        old.map((t) => (t.id === taskId ? { ...t, column: newColumn } : t))
+      );
+
+      // Trigger backend update mutation to persist change
+      moveTask.mutate({ ...task, column: newColumn });
+    }
+  };
+
+  // Define the fixed columns of the Kanban board
+  const columns = ["backlog", "in_progress", "review", "done"];
+
+  /**
+   * Filters tasks for a given column and matches against search query.
+   * Performs case-insensitive search on title and description fields.
+   */
+  const getTasksByColumn = (col: string) =>
+    tasks.filter(
+      (t) =>
+        t.column === col &&
+        (t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          t.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+
+  /**
+   * Handler to open the edit modal for a specific task.
+   * This will be passed down to TaskColumn -> TaskCard.
+   */
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task);
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <>
+      {/* Main header */}
+      <Typography variant="h4" sx={{ mt: 4, mb: 2, textAlign: "center" }}>
+        Home Renovation 🏠
+      </Typography>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+      {/* Search input box */}
+      <TextField
+        label="Search"
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        sx={{ display: "block", mx: "auto", width: 300 }}
+      />
+
+      {/* DragDropContext enables drag-and-drop behavior for child droppables/draggables */}
+      <DragDropContext onDragEnd={handleDragEnd}>
+        <Box sx={{ display: "flex", gap: 2, justifyContent: "center", mt: 4 }}>
+          {/* Render a column for each defined column key, passing edit handler */}
+          {columns.map((col) => (
+            <TaskColumn
+              key={col}
+              columnKey={col}
+              title={col.replace("_", " ").toUpperCase()}
+              tasks={getTasksByColumn(col)}
+              onEditTask={handleEditTask} // pass correctly typed callback
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          ))}
+        </Box>
+      </DragDropContext>
+
+      {/* Edit task modal; opens when editingTask is not null */}
+      {editingTask && (
+        <TaskFormModal
+          open={!!editingTask}
+          initialData={editingTask}
+          onClose={() => setEditingTask(null)}
+          onSubmit={(updatedTask) => {
+            if (updatedTask.id !== undefined) {
+              updateTaskMutation.mutate({
+                ...updatedTask,
+                id: updatedTask.id, // Ensure id is defined
+              });
+            } else {
+              console.error("Task ID is undefined. Cannot update task.");
+            }
+          }}
+        />
+      )}
+    </>
   );
 }

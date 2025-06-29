@@ -1,0 +1,40 @@
+{
+  "tasks": [
+    {
+      "id": "1",
+      "title": "Tile upstairs bathroom",
+      "description": "Complete tiling work",
+      "column": "backlog"
+    },
+    {
+      "id": "2",
+      "title": "Paint wooden shed",
+      "description": "Use waterproof paint",
+      "column": "backlog"
+    },
+    {
+      "id": "3",
+      "title": "Replace bathroom tub with glass shower",
+      "description": "",
+      "column": "in_progress"
+    },
+    {
+      "id": "4",
+      "title": "Install herringbone wood flooring in bedrooms",
+      "description": "",
+      "column": "done"
+    },
+    {
+      "id": "39e7",
+      "column": "in_progress",
+      "title": "hello world",
+      "description": "hey"
+    },
+    {
+      "id": "b20d",
+      "column": "review",
+      "title": "hey",
+      "description": "hey"
+    }
+  ]
+}
